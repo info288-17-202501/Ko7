@@ -1,5 +1,5 @@
 # Ko7
-Proyecto de sistemas distribuidos, grupo Ko7.
+Proyecto de sistemas distribuidos del grupo Ko7.
 
 **Integrantes:**
   - Benjamín Parra Barbet
