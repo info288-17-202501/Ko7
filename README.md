@@ -1,4 +1,4 @@
-# Ko7 aa
+# Ko7 
 Proyecto de sistemas distribuidos del grupo Ko7.
 
 **Integrantes:**
