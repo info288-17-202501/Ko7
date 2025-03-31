@@ -1,5 +1,5 @@
 # Ko7 
-Proyecto de sistemas distribuidos del grupo Ko7.
+Proyecto de sistemas distribuidos (INFO288) del grupo Ko7.
 
 **Integrantes:**
   - Benjamín Parra Barbet
@@ -7,3 +7,5 @@ Proyecto de sistemas distribuidos del grupo Ko7.
   - Pascal Salinas Schmidt
   - Cristóbal Rebolledo Oyanedel
   - Renton Tapia Yefi
+
+Este repositorio contiene un juego de cartas multijugador distribuido, donde los jugadores tienen su propia baraja y deben usar las cartas de forma estratégica para poder ganar.
