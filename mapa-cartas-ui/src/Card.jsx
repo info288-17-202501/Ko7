@@ -20,8 +20,8 @@ class Card extends React.Component {
       document.removeEventListener('card-activated', this.handleCardActivated);
     }
   }
-
   handleMouseEnter = () => {
+    // Al pasar el ratón sobre la carta, la marcamos como hover y mostramos su descripción si tiene una
     this.setState({ isHovered: true });
   };
 
@@ -75,8 +75,7 @@ class Card extends React.Component {
     } else if (!this.state.isDescriptionVisible && prevState.isDescriptionVisible) {
       document.removeEventListener('card-activated', this.handleCardActivated);
     }
-  }
-  componentDidMount() {
+  }  componentDidMount() {
     // Al montar el componente, nos suscribimos a los clics globales
     document.addEventListener('click', this.handleGlobalClick);
     
@@ -84,6 +83,7 @@ class Card extends React.Component {
     if (!this.portalRoot) {
       this.portalRoot = document.createElement('div');
       this.portalRoot.className = 'card-description-portal';
+      this.portalRoot.style.zIndex = "10000"; // Asegurar que está por encima de todos los elementos
       document.body.appendChild(this.portalRoot);
     }
   }
@@ -97,7 +97,6 @@ class Card extends React.Component {
       document.body.removeChild(this.portalRoot);
     }
   }
-
   renderDescriptionPortal() {
     const { isHovered, isDescriptionVisible } = this.state;
     const isSmall = this.props.isSmall;
@@ -111,10 +110,9 @@ class Card extends React.Component {
     if (!rect) return null;
     
     // Posición centrada sobre la carta
-    const topPosition = rect.top - 20; // 20px por encima de la carta
+    const topPosition = rect.top - 10; // 10px por encima de la carta
     const leftPosition = rect.left + rect.width / 2;
-    
-    return ReactDOM.createPortal(
+      return ReactDOM.createPortal(
       <span 
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -135,7 +133,9 @@ class Card extends React.Component {
           pointerEvents: 'auto',
           overflowY: 'auto',
           lineHeight: '1.4',
-          display: 'block'
+          display: 'block',
+          opacity: 1,
+          visibility: 'visible'
         }}
       >
         <span style={{ 
