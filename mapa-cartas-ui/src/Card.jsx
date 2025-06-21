@@ -28,10 +28,14 @@ class Card extends React.Component {
   handleMouseLeave = () => {
     this.setState({ isHovered: false });
   };
-
   handleClick = (e) => {
-    // Al hacer clic en la carta, mostramos su descripción
-    e.stopPropagation(); // Evitamos que el clic llegue al documento
+    // Vamos a permitir que el clic llegue al hexágono si la carta está en el tablero
+    const isInBoard = this.props.isSmall && this.props.inBoard;
+    
+    if (!isInBoard) {
+      // Solo detenemos la propagación para cartas que no están en el tablero
+      e.stopPropagation();
+    }
     
     // Si esta carta ya estaba activa, desactivamos todas
     if (activeCardId === this.props.id) {
@@ -55,36 +59,42 @@ class Card extends React.Component {
       this.setState({ isDescriptionVisible: false });
     }
   };
-  
-  handleCardActivated = (e) => {
+    handleCardActivated = (e) => {
     // Si otra carta fue activada, ocultamos nuestra descripción
     if (e.detail.cardId !== this.props.id && this.state.isDescriptionVisible) {
       this.setState({ isDescriptionVisible: false });
     }
   };
-
+  
   handleDragStart = (e) => {
     e.dataTransfer.setData("cardId", this.props.id);
     e.dataTransfer.setData("cardType", this.props.type);
     e.dataTransfer.setData("cardName", this.props.name || "Sin nombre");
     e.dataTransfer.setData("cardRarity", this.props.rarity || "Común");
-  };  componentDidUpdate(prevProps, prevState) {
-    // Si cambiamos de estado, suscribirse al evento de activación de otra carta
-    if (this.state.isDescriptionVisible && !prevState.isDescriptionVisible) {
-      document.addEventListener('card-activated', this.handleCardActivated);
-    } else if (!this.state.isDescriptionVisible && prevState.isDescriptionVisible) {
-      document.removeEventListener('card-activated', this.handleCardActivated);
+    
+    // También pasamos las estadísticas si están disponibles
+    if (this.props.stats) {
+      try {
+        e.dataTransfer.setData("cardStats", JSON.stringify(this.props.stats));
+      } catch (error) {
+        console.error("Error al serializar las estadísticas:", error);
+      }
     }
-  }  componentDidMount() {
+  };
+  
+  componentDidMount() {
     // Al montar el componente, nos suscribimos a los clics globales
     document.addEventListener('click', this.handleGlobalClick);
-    
+
     // Crear un div para el portal de la descripción si no existe
-    if (!this.portalRoot) {
+    if (!this.portalRoot || !document.body.contains(this.portalRoot)) {
       this.portalRoot = document.createElement('div');
       this.portalRoot.className = 'card-description-portal';
       this.portalRoot.style.zIndex = "10000"; // Asegurar que está por encima de todos los elementos
       document.body.appendChild(this.portalRoot);
+      console.log("PortalRoot creado correctamente.");
+    } else {
+      console.log("PortalRoot ya existe.");
     }
   }
 
@@ -95,31 +105,58 @@ class Card extends React.Component {
     // Eliminar el portal si existe
     if (this.portalRoot && document.body.contains(this.portalRoot)) {
       document.body.removeChild(this.portalRoot);
-    }
-  }
+    }  }
+  
   renderDescriptionPortal() {
     const { isHovered, isDescriptionVisible } = this.state;
-    const isSmall = this.props.isSmall;
-    
-    if (!this.portalRoot || !(isHovered || isDescriptionVisible) || !this.props.description) {
+
+    // Verificar si el portalRoot existe
+    if (!this.portalRoot) {
+      console.error("El portalRoot no está definido.");
       return null;
     }
-    
+
+    // Verificar si el ratón está encima o si la descripción debe mostrarse
+    if (!(isHovered || isDescriptionVisible)) {
+      console.log("El portal no se renderiza porque isHovered o isDescriptionVisible son false.");
+      return null;
+    }
+
     // Calcular posición para la descripción
     let rect = this.cardRef?.getBoundingClientRect();
-    if (!rect) return null;
-    
-    // Posición centrada sobre la carta
-    const topPosition = rect.top - 10; // 10px por encima de la carta
+    if (!rect) {
+      console.error("No se pudo obtener el rect de cardRef.");
+      return null;
+    }
+
+    const windowHeight = window.innerHeight;
+    const spaceAbove = rect.top;
+    const tooltipEstimatedHeight = 250; // Altura estimada basada en contenido
+
+    const showBelow = spaceAbove < tooltipEstimatedHeight;
+    const topPosition = showBelow 
+        ? (rect.bottom + 10) // 10px debajo de la carta
+        : (rect.top - 10);   // 10px encima de la carta
     const leftPosition = rect.left + rect.width / 2;
-      return ReactDOM.createPortal(
+
+    const transform = showBelow 
+        ? 'translateX(-50%)' // Si está abajo, solo centrar horizontalmente
+        : 'translateX(-50%) translateY(-100%)'; // Si está arriba, mover hacia arriba
+
+    const stats = this.props.stats || {};
+    const hasAttack = stats.attack !== undefined;
+    const hasHealth = stats.health !== undefined;
+    const hasCost = stats.cost !== undefined;
+    const hasActions = stats.actions !== undefined;
+
+    return ReactDOM.createPortal(
       <span 
         onClick={(e) => e.stopPropagation()}
         style={{
           position: 'fixed',
           top: `${topPosition}px`,
           left: `${leftPosition}px`,
-          transform: 'translateX(-50%) translateY(-100%)',
+          transform: transform,
           backgroundColor: 'rgba(0, 0, 0, 0.9)',
           color: 'white',
           padding: '15px',
@@ -156,14 +193,42 @@ class Card extends React.Component {
           textAlign: 'center',
           display: 'block'
         }}>
-          {this.props.rarity}
+          {this.props.rarity} • {this.props.type}
         </span>
-        <span style={{ 
-          textAlign: 'justify',
-          display: 'block'
+        <div style={{
+          marginTop: '10px',
+          display: 'flex',
+          justifyContent: 'space-around',
+          flexWrap: 'wrap'
         }}>
-          {this.props.description}
-        </span>
+          {hasAttack && (
+            <div style={{ textAlign: 'center' }}>
+              <span style={{ fontSize: '24px' }}>⚔️</span>
+              <span style={{ fontSize: '18px' }}>{stats.attack}</span>
+            </div>
+          )}
+          {hasHealth && (
+            <div style={{ textAlign: 'center' }}>
+              <span style={{ fontSize: '24px' }}>❤️</span>
+              <span style={{ fontSize: '18px' }}>{stats.health}</span>
+            </div>
+          )}
+          {hasCost && (
+            <div style={{ textAlign: 'center' }}>
+              <span style={{ fontSize: '24px' }}>💎</span>
+              <span style={{ fontSize: '18px' }}>{stats.cost}</span>
+            </div>
+          )}
+          {hasActions && (
+            <div style={{ textAlign: 'center' }}>
+              <span style={{ fontSize: '24px' }}>🏃</span>
+              <span style={{ fontSize: '18px' }}>{stats.actions}</span>
+            </div>
+          )}
+        </div>
+        <div style={{ marginTop: '10px', textAlign: 'justify' }}>
+          {this.props.description || <em style={{ color: '#aaa' }}>Sin descripción disponible</em>}
+        </div>
       </span>,
       this.portalRoot
     );
