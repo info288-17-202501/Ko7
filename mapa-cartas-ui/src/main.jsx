@@ -1,9 +1,12 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import GameBoardWithAPI from './App.jsx'
+import GameBoardWithAPI from './Game.jsx'
+import App from './App.jsx'
+import MainMenu from './MainMenu.jsx'
+
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <GameBoardWithAPI />
+    <App/>
   </React.StrictMode>
 )

@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cliente Matchmaking - Sistema Distribuido</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #1a1a1a;
+        }
+        .status-panel {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .status-row:last-child {
+            margin-bottom: 0;
+        }
+        .connection-area {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .game-area {
+            display: none;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .waiting-area {
+            display: none;
+            background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
+            color: #2d3436;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .messages {
+            background-color: #fff;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            height: 300px;
+            overflow-y: scroll;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        .message {
+            margin-bottom: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .message:last-child {
+            border-bottom: none;
+        }
+        .message.system {
+            color: #6c757d;
+            font-style: italic;
+        }
+        .message.player {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .message.opponent {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .message.error {
+            color: #e74c3c;
+            background-color: #fdf2f2;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+        button.success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        button.danger {
+            background: linear-gradient(135deg, #ee5a24 0%, #e55039 100%);
+        }
+        input {
+            padding: 12px;
+            margin: 8px 0;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            width: 100%;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .info-badge {
+            background-color: #e3f2fd;
+            color: #1565c0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .success-badge {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .waiting-badge {
+            background-color: #fff3e0;
+            color: #f57c00;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 Cliente del Sistema de Matchmaking</h1>
+            <p>Sistema distribuido con Matchmaking Service + Game Engine</p>
+        </div>
+        
+        <div class="status-panel">
+            <div class="status-row">
+                <span><strong>🔌 Estado Matchmaking:</strong></span>
+                <span id="matchmaking-status" class="info-badge">Desconectado</span>
+            </div>
+            <div class="status-row">
+                <span><strong>🎯 Estado Game Server:</strong></span>
+                <span id="game-status" class="info-badge">Desconectado</span>
+            </div>
+            <div class="status-row">
+                <span><strong>👤 Jugador ID:</strong></span>
+                <span id="current-player-id">-</span>
+            </div>
+            <div class="status-row">
+                <span><strong>🎲 Match ID:</strong></span>
+                <span id="current-match-id">-</span>
+            </div>
+        </div>
+        
+        <div id="connection-area" class="connection-area">
+            <h3>📋 Configuración del Jugador</h3>
+            <div>
+                <label for="player-id"><strong>Tu ID de Jugador:</strong></label>
+                <input type="number" id="player-id" min="1" max="9999" value="1" placeholder="Ingresa tu ID (1-9999)">
+            </div>
+            <div>
+                <label for="matchmaking-url"><strong>URL del Matchmaking Service:</strong></label>
+                <input type="text" id="matchmaking-url" value="http://127.0.0.1:9011" placeholder="http://127.0.0.1:9011">
+            </div>
+            <div class="action-buttons">
+                <button id="join-queue-button" class="success">🔍 Buscar Partida</button>
+                <button id="leave-queue-button" class="danger" disabled>❌ Salir de Cola</button>
+                <button id="reconect-button">📊 Reconectar juego </button>
+            </div>
+        </div>
+        
+        <div id="waiting-area" class="waiting-area">
+            <h3>⏳ Buscando Oponente...</h3>
+            <div class="spinner"></div>
+            <p>Esperando que otro jugador se una a la partida...</p>
+            <button id="cancel-search-button" class="danger">Cancelar Búsqueda</button>
+        </div>
+        
+        <div id="game-area" class="game-area">
+            <h3>🎉 ¡Partida Encontrada!</h3>
+            <div style="margin-bottom: 15px;">
+                <span class="success-badge">Conectado al Game Server</span>
+                <span style="margin-left: 10px;">🆚 vs Jugador <span id="opponent-id">-</span></span>
+            </div>
+            <div class="action-buttons">
+                <button id="send-hello-button" class="success">👋 Enviar "Hola"</button>
+                <button id="send-custom-button" class="success">💬 Mensaje Personalizado</button>
+                <button id="disconnect-game-button" class="danger">🔌 Desconectar del Juego</button>
+            </div>
+            <div style="margin-top: 10px;">
+                <input type="text" id="custom-message" placeholder="Escribe tu mensaje personalizado..." style="display: inline-block; width: 70%;">
+                <button id="send-custom-msg-button" style="display: inline-block; width: 25%;">📤 Enviar</button>
+            </div>
+        </div>
+        
+        <div>
+            <h3>📨 Registro de Mensajes</h3>
+            <div class="messages" id="messages-area">
+                <div class="message system">🚀 Sistema iniciado. Ingresa tu ID y busca una partida.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales del sistema
+        let playerId = null;
+        let matchId = null;
+        let gameSocket = null;
+        let gameServerIp = null;
+        let gameServerPort = null;
+        let matchmakingUrl = 'http://127.0.0.1:9001';
+        let isInQueue = false;
+        let isInGame = false;
+        
+        // Referencias DOM
+        const elements = {
+            playerIdInput: document.getElementById('player-id'),
+            matchmakingUrlInput: document.getElementById('matchmaking-url'),
+            matchmakingStatus: document.getElementById('matchmaking-status'),
+            gameStatus: document.getElementById('game-status'),
+            currentPlayerId: document.getElementById('current-player-id'),
+            currentMatchId: document.getElementById('current-match-id'),
+            opponentId: document.getElementById('opponent-id'),
+            messagesArea: document.getElementById('messages-area'),
+            connectionArea: document.getElementById('connection-area'),
+            waitingArea: document.getElementById('waiting-area'),
+            gameArea: document.getElementById('game-area'),
+            joinQueueButton: document.getElementById('join-queue-button'),
+            leaveQueueButton: document.getElementById('leave-queue-button'),
+            reconectButton: document.getElementById('reconect-button'),
+            cancelSearchButton: document.getElementById('cancel-search-button'),
+            sendHelloButton: document.getElementById('send-hello-button'),
+            sendCustomButton: document.getElementById('send-custom-button'),
+            disconnectGameButton: document.getElementById('disconnect-game-button'),
+            customMessageInput: document.getElementById('custom-message'),
+            sendCustomMsgButton: document.getElementById('send-custom-msg-button')
+        };
+        
+        // Funciones de utilidad
+        function addMessage(content, type = 'system') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            messageDiv.innerHTML = `<span style="color: #6c757d;">[${timestamp}]</span> ${content}`;
+            
+            elements.messagesArea.appendChild(messageDiv);
+            elements.messagesArea.scrollTop = elements.messagesArea.scrollHeight;
+        }
+        
+        function updateStatus() {
+            elements.currentPlayerId.textContent = playerId || '-';
+            elements.currentMatchId.textContent = matchId || '-';
+            
+            // Actualizar estados
+            if (isInQueue) {
+                elements.matchmakingStatus.textContent = 'En Cola';
+                elements.matchmakingStatus.className = 'waiting-badge';
+            } else if (isInGame) {
+                elements.matchmakingStatus.textContent = 'En Partida';
+                elements.matchmakingStatus.className = 'success-badge';
+            } else {
+                elements.matchmakingStatus.textContent = 'Desconectado';
+                elements.matchmakingStatus.className = 'info-badge';
+            }
+            
+            if (gameSocket && gameSocket.readyState === WebSocket.OPEN) {
+                elements.gameStatus.textContent = 'Conectado';
+                elements.gameStatus.className = 'success-badge';
+            } else {
+                elements.gameStatus.textContent = 'Desconectado';
+                elements.gameStatus.className = 'info-badge';
+            }
+        }
+        
+        function showArea(areaName) {
+            elements.connectionArea.style.display = areaName === 'connection' ? 'block' : 'none';
+            elements.waitingArea.style.display = areaName === 'waiting' ? 'block' : 'none';
+            elements.gameArea.style.display = areaName === 'game' ? 'block' : 'none';
+        }
+        
+        function updateButtons() {
+            elements.joinQueueButton.disabled = isInQueue || isInGame;
+            elements.leaveQueueButton.disabled = !isInQueue;
+            elements.reconectButton.disabled = false;
+        }
+        
+        // Funciones de comunicación con Matchmaking Service
+        async function sendMatchmakingRequest(action, additionalData = {}) {
+            try {
+                const requestData = {
+                    action: action,
+                    playerId: playerId,
+                    ...additionalData
+                };
+                
+                addMessage(`📤 Enviando: ${action} (Jugador ${playerId})`, 'system');
+                
+                const response = await fetch(matchmakingUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const data = await response.json();
+                addMessage(`📥 Respuesta: ${JSON.stringify(data)}`, 'system');
+                
+                return data;
+            } catch (error) {
+                addMessage(`❌ Error de comunicación: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+        
+        async function joinMatchmakingQueue() {
+            try {
+                playerId = parseInt(elements.playerIdInput.value);
+                matchmakingUrl = elements.matchmakingUrlInput.value;
+                
+                if (!playerId || playerId < 1) {
+                    addMessage('❌ ID de jugador inválido', 'error');
+                    return;
+                }
+                
+                addMessage(`🔍 Jugador ${playerId} buscando partida...`, 'player');
+                
+                const responsedeck = await sendMatchmakingRequest('confirmDeck', {BarajaId:1});
+                if (responsedeck.status ==="deck_required"){
+                    if (1 == 1) {
+                        addMessage(`✅ Baraja confirmada para el jugador ${playerId}`, 'system');
+                    } else {
+                        addMessage(`❌ Error al confirmar la baraja: ${responsedeck.message}`, 'error');
+                        return;
+                    }
+                }
+                
+                const response = await sendMatchmakingRequest('joinMatch',{BarajaId:1});
+                
+                if (response.status === 'waiting') {
+                    isInQueue = true;
+                    addMessage(`⏳ Jugador ${playerId} en cola de espera`, 'system');
+                    showArea('waiting');
+                    
+                    // Verificar periódicamente el estado
+                    startStatusCheck();
+                    
+                } else if (response.status === 'matched') {
+                    handleMatchFound(response);
+                } else {
+                    addMessage(`❌ Error en matchmaking: ${response.message || 'Error desconocido'}`, 'error');
+                }
+                
+            } catch (error) {
+                addMessage(`❌ Error: ${error.message}`, 'error');
+            }
+            
+            updateStatus();
+            updateButtons();
+        }
+        
+        async function leaveMatchmakingQueue() {
+            try {
+                addMessage(`🚪 Jugador ${playerId} saliendo de la cola...`, 'player');
+                
+                const response = await sendMatchmakingRequest('leaveMatch');
+                
+                if (response.status === 'success') {
+                    isInQueue = false;
+                    addMessage(`✅ Saliste de la cola de matchmaking`, 'system');
+                    showArea('connection');
+                    stopStatusCheck();
+                } else {
+                    addMessage(`❌ Error al salir: ${response.message || 'Error desconocido'}`, 'error');
+                }
+                
+            } catch (error) {
+                addMessage(`❌ Error: ${error.message}`, 'error');
+            }
+            
+            updateStatus();
+            updateButtons();
+        }
+        
+        async function checkMatchStatus() {
+            try {
+                if (!playerId) {
+                    addMessage('❌ No hay jugador configurado', 'error');
+                    return;
+                }
+                
+                const response = await sendMatchmakingRequest('getActiveMatch');
+                
+                if (response.status === 'matched' && response.gameServer) {
+                    if (!isInGame) {
+                        handleMatchFound(response);
+                    }
+                } else if (response.status === 'waiting') {
+                    if (!isInQueue) {
+                        isInQueue = true;
+                        showArea('waiting');
+                        startStatusCheck();
+                    }
+                } else if (response.status === 'not_found') {
+                    if (isInQueue) {
+                        isInQueue = false;
+                        showArea('connection');
+                        stopStatusCheck();
+                    }
+                    addMessage(`ℹ️ Jugador ${playerId} no está en ninguna partida`, 'system');
+                }
+                
+            } catch (error) {
+                addMessage(`❌ Error verificando estado: ${error.message}`, 'error');
+            }
+            
+            updateStatus();
+            updateButtons();
+        }
+        
+        function handleMatchFound(response) {
+            matchId = response.matchId;
+            gameServerIp = response.gameServer.ip;
+            gameServerPort = response.gameServer.port;
+            
+            const opponentInfo = response.players.find(p => p !== playerId);
+            elements.opponentId.textContent = opponentInfo || 'Desconocido';
+            
+            isInQueue = false;
+            isInGame = true;
+            
+            addMessage(`🎉 ¡Partida encontrada! Match ID: ${matchId}`, 'system');
+            addMessage(`🎮 Conectando al Game Server: ${gameServerIp}:${gameServerPort}`, 'system');
+            
+            showArea('game');
+            stopStatusCheck();
+            connectToGameServer();
+        }
+        
+        // Funciones de comunicación con Game Server
+        function connectToGameServer() {
+            try {
+                const wsUrl = `ws://${gameServerIp}:${gameServerPort}`;
+                addMessage(`🔌 Conectando por WebSocket a: ${wsUrl}`, 'system');
+                
+                gameSocket = new WebSocket(wsUrl);
+                
+                gameSocket.onopen = function() {
+                    addMessage(`✅ Conectado al Game Server`, 'system');
+                    
+                    // Enviar mensaje de identificación
+                    const identifyMessage = {
+                        type: 'identify',
+                        playerId: playerId,
+                        matchId: matchId
+                    };
+                    
+                    gameSocket.send(JSON.stringify(identifyMessage));
+                    updateStatus();
+                };
+                
+                gameSocket.onmessage = function(event) {
+                    try {
+                        const message = JSON.parse(event.data);
+                        handleGameMessage(message);
+                    } catch (error) {
+                        addMessage(`📥 Mensaje del servidor: ${event.data}`, 'system');
+                    }
+                };
+                
+                gameSocket.onclose = function() {
+                    addMessage(`🔌 Desconectado del Game Server`, 'system');
+                    updateStatus();
+                };
+                
+                gameSocket.onerror = function(error) {
+                    addMessage(`❌ Error en Game Server: ${error.message || 'Error de conexión'}`, 'error');
+                    updateStatus();
+                };
+                
+            } catch (error) {
+                addMessage(`❌ Error conectando al Game Server: ${error.message}`, 'error');
+            }
+        }
+        
+        function handleGameMessage(message) {
+            addMessage(`📥 Mensaje del Game Server: ${JSON.stringify(message)}`, 'system');
+            
+            if (message.type === 'playerMessage') {
+                const fromPlayer = message.fromPlayerId;
+                const content = message.content;
+                
+                if (fromPlayer === playerId) {
+                    addMessage(`💬 Tú: ${content}`, 'player');
+                } else {
+                    addMessage(`💬 Jugador ${fromPlayer}: ${content}`, 'opponent');
+                }
+            } else if (message.type === 'action') {
+                addMessage(`🎮 Evento: ${message.content}`, 'system');
+            }
+        }
+        
+        function sendGameMessage(content) {
+            if (!gameSocket || gameSocket.readyState !== WebSocket.OPEN) {
+                addMessage('❌ No conectado al Game Server', 'error');
+                return;
+            }
+            const message = {
+                type: 'playerMessage',
+                playerId: playerId,
+                matchId: matchId,
+                content: content
+            };
+            
+            try {
+                gameSocket.send(JSON.stringify(message));
+                addMessage(`📤 Enviado: ${content}`, 'player');
+            } catch (error) {
+                addMessage(`❌ Error enviando mensaje: ${error.message}`, 'error');
+            }
+        }
+        
+        function disconnectFromGame() {
+            if (gameSocket) {
+                gameSocket.close();
+                gameSocket = null;
+            }
+            
+            isInGame = false;
+            matchId = null;
+            gameServerIp = null;
+            gameServerPort = null;
+            
+            addMessage(`🚪 Te desconectaste del juego`, 'player');
+            showArea('connection');
+            updateStatus();
+            updateButtons();
+        }
+        
+        // Sistema de verificación periódica
+        let statusCheckInterval = null;
+        
+        function startStatusCheck() {
+            if (statusCheckInterval) return;
+            
+            statusCheckInterval = setInterval(async () => {
+                if (isInQueue && !isInGame) {
+                    await checkMatchStatus();
+                }
+            }, 3000); // Verificar cada 3 segundos
+        }
+        
+        function stopStatusCheck() {
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+                statusCheckInterval = null;
+            }
+        }
+        
+        // Event Listeners
+        elements.joinQueueButton.addEventListener('click', joinMatchmakingQueue);
+        elements.leaveQueueButton.addEventListener('click', leaveMatchmakingQueue);
+        elements.reconectButton.addEventListener('click', checkMatchStatus);
+        elements.cancelSearchButton.addEventListener('click', leaveMatchmakingQueue);
+        
+        elements.sendHelloButton.addEventListener('click', () => {
+            sendGameMessage(`¡Hola! Soy el jugador ${playerId}`);
+        });
+        
+        elements.sendCustomButton.addEventListener('click', () => {
+            const customMsg = elements.customMessageInput.value.trim();
+            if (customMsg) {
+                sendGameMessage(customMsg);
+                elements.customMessageInput.value = '';
+            } else {
+                addMessage('❌ Escribe un mensaje antes de enviar', 'error');
+            }
+        });
+        
+        elements.sendCustomMsgButton.addEventListener('click', () => {
+            elements.sendCustomButton.click();
+        });
+        
+        elements.customMessageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                elements.sendCustomButton.click();
+            }
+        });
+        
+        elements.disconnectGameButton.addEventListener('click', disconnectFromGame);
+        
+        // Inicialización
+        updateStatus();
+        updateButtons();
+        addMessage('🎮 Cliente de Matchmaking listo. Configura tu ID y busca una partida.', 'system');
+    </script>
+</body>
+</html>

@@ -1,7 +1,8 @@
 import React from 'react';
+import './styles/animations.css'; // Asegúrate de que el CSS esté correctamente importado
 
 // Tamaño del hexágono (importado de las constantes)
-export const HEX_SIZE = 45; // Reducido para mejor ajuste
+export const HEX_SIZE =40; // Reducido para mejor ajuste
 export const HEX_WIDTH = HEX_SIZE * 2;
 export const HEX_HEIGHT = HEX_SIZE * Math.sqrt(3);
 
@@ -44,7 +45,8 @@ class HexCell extends React.Component {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          zIndex: selected ? 10 : 1,
         }}
         onClick={() => onClick(q, r)}
         onDrop={(e) => onDrop(e, q, r)}
@@ -53,13 +55,19 @@ class HexCell extends React.Component {
         <svg 
           width={HEX_WIDTH} 
           height={HEX_HEIGHT}
-          style={{ position: 'absolute', top: 0, left: 0 }}
+          style={{ position: 'absolute', top: 0, left: 0, bottom:0, right: 0, overflow: 'visible' }}
         >
+        <defs>
+          <linearGradient id="hex-hover-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#e3f2fd" />
+            <stop offset="100%" stopColor="#bbdefb" />
+          </linearGradient>
+        </defs>
           <polygon
             points={points.join(' ')}
-            fill={selected ? "#e3f2fd" : "#f5f5f5"}
-            stroke={selected ? "#2196f3" : "#333"}
-            strokeWidth="2"
+            className={selected ? "hex-polygon-selected" : "hex-polygon"}
+         
+            strokeWidth="3"
             transform={`translate(${HEX_SIZE}, ${HEX_SIZE})`}
           />
         </svg>

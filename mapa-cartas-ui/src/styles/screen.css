@@ -1,0 +1,22 @@
+html, body, .wrapper {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden; /* evitas scrollbars */
+  
+}
+
+/* Centras el contenido dentro del wrapper */
+.wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* El div que quieres “pantalla completa”, pero escalado al 80% */
+.content {
+  width: 100vw;
+  height: 100vh;
+  transform: scale(0.8);
+  transform-origin: center center;
+}

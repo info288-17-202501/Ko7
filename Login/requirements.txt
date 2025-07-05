@@ -1,0 +1,7 @@
+uvicorn
+bcrypt
+databases
+dotenv
+fastapi
+asyncpg
+psycopg2

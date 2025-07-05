@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Debugger</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .endpoint {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow: auto;
+            max-height: 300px;
+            white-space: pre-wrap;
+        }
+        .response {
+            margin-top: 10px;
+            padding: 10px;
+            border-left: 4px solid #4CAF50;
+            background-color: #f1f8e9;
+            display: none;
+        }
+        .error {
+            border-left: 4px solid #f44336;
+            background-color: #ffebee;
+        }
+        input[type="text"], input[type="number"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+            margin-right: 10px;
+        }
+        .header {
+            background-color: #333;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>API Debugger para Barajas</h1>
+        <p>Esta herramienta te permite probar directamente los endpoints de la API de barajas y ver las respuestas.</p>
+    </div>
+    
+    <div class="endpoint" style="background-color: #e3f2fd; border-color: #2196F3;">
+        <h2>Formato de Barajas para Partida</h2>
+        <p>Genera el formato JSON de barajas para asignar a los jugadores. Formato: <code>{ decks: [{ name, cards: [...] }, ...] }</code></p>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px;">
+            <div style="flex: 1; min-width: 300px;">
+                <h3>Catálogo de Cartas</h3>
+                <button onclick="cargarTodasLasCartas()">Cargar Cartas Disponibles</button>
+                <div style="margin-top: 10px;">
+                    <input type="text" id="buscarCartas" placeholder="Buscar cartas..." oninput="filtrarCartas()">
+                    <select id="filtroTipo" onchange="filtrarCartas()">
+                        <option value="">Todos los tipos</option>
+                        <option value="unit">Aliado</option>
+                        <option value="spell">Hechizo</option>
+                        <option value="legend">Personaje</option>
+                    </select>
+                </div>
+                <div id="catalogoCartas" style="max-height: 300px; overflow-y: auto; margin-top: 10px; border: 1px solid #ddd; padding: 10px;"></div>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <h3>Deck 1</h3>
+            <input type="text" id="deck1Name" placeholder="Nombre del Deck 1" value="Combat Deck">
+            <button onclick="limpiarBaraja1()">Limpiar Deck</button>
+            <div id="deck1Cards" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-top: 10px;"></div>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <h3>Deck 2</h3>
+            <input type="text" id="deck2Name" placeholder="Nombre del Deck 2" value="Spell Deck">
+            <button onclick="limpiarBaraja2()">Limpiar Deck</button>
+            <div id="deck2Cards" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-top: 10px;"></div>
+        </div>
+        
+        <button onclick="generateDeckFormat()" style="background-color: #2196F3; font-weight: bold; padding: 12px 20px; font-size: 16px;">Generar Formato JSON</button>
+        <div id="formatoBarajasResponse" class="response" style="border-left-color: #2196F3;"></div>
+    </div>
+
+    <div class="endpoint">
+        <h2>GET /api/barajas</h2>
+        <p>Obtiene todas las barajas disponibles.</p>
+        <button onclick="testGetBarajas()">Probar</button>
+        <div id="getBarajasResponse" class="response"></div>
+    </div>
+
+    <div class="endpoint">
+        <h2>GET /api/usuarios/:userId/barajas</h2>
+        <p>Obtiene todas las barajas de un usuario específico.</p>
+        <input type="number" id="getUserBarajasId" placeholder="ID de Usuario" value="1">
+        <button onclick="testGetUserBarajas()">Probar</button>
+        <div id="getUserBarajasResponse" class="response"></div>
+    </div>
+
+    <div class="endpoint">
+        <h2>GET /api/barajas/:id</h2>
+        <p>Obtiene una baraja por su ID.</p>
+        <input type="number" id="getBarajaId" placeholder="ID de Baraja" value="1">
+        <button onclick="testGetBaraja()">Probar</button>
+        <div id="getBarajaResponse" class="response"></div>
+    </div>
+
+    <div class="endpoint">
+        <h2>GET /api/barajas/:id/cartas</h2>
+        <p>Obtiene todas las cartas de una baraja.</p>
+        <input type="number" id="getCartasBarajaId" placeholder="ID de Baraja" value="1">
+        <button onclick="testGetCartasBaraja()">Probar</button>
+        <div id="getCartasBarajaResponse" class="response"></div>
+    </div>
+
+    <div class="endpoint">
+        <h2>POST /api/barajas</h2>
+        <p>Crea una nueva baraja.</p>
+        <input type="number" id="createBarajaUserId" placeholder="ID de Usuario" value="1">
+        <input type="text" id="createBarajaName" placeholder="Nombre de Baraja" value="Nueva Baraja">
+        <input type="text" id="createBarajaSleevePath" placeholder="Ruta de Sleeve (opcional)">
+        <button onclick="testCreateBaraja()">Probar</button>
+        <div id="createBarajaResponse" class="response"></div>
+    </div>
+
+    <div class="endpoint">
+        <h2>DELETE /api/barajas/:id</h2>
+        <p>Elimina una baraja por su ID.</p>
+        <input type="number" id="deleteBarajaId" placeholder="ID de Baraja">
+        <button onclick="testDeleteBaraja()">Probar</button>
+        <div id="deleteBarajaResponse" class="response"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3030/api';
+        
+        // Variables para mantener el estado de las barajas y catálogo de cartas
+        let deck1Cards = [];
+        let deck2Cards = [];
+        let allCards = [];
+        let filteredCards = [];
+        
+        // Función para mostrar respuestas
+        function showResponse(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `response ${isError ? 'error' : ''}`;
+            
+            if (typeof data === 'object') {
+                element.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } else {
+                element.innerHTML = `<pre>${data}</pre>`;
+            }
+        }
+
+        // Función para cargar todas las cartas desde la API
+        async function cargarTodasLasCartas() {
+            const catalogoElement = document.getElementById('catalogoCartas');
+            catalogoElement.innerHTML = '<p>Cargando cartas...</p>';
+            
+            try {
+                console.log('Solicitando todas las cartas...');
+                const response = await fetch(`${API_BASE_URL}/cards`);
+                console.log('Respuesta recibida:', response.status, response.statusText);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Datos recibidos:', data);
+                allCards = data.map(card => ({
+                    id: card.id,
+                    name: card.name || 'Sin Nombre',
+                    descripcion: card.description || 'Sin Descripción',
+                   // description: card.description || 'Sin Descripción',
+                    //tipo: getTipoDisplay(card.type),
+                    //tipoInterno: card.type,
+                    type: card.type,
+                    cost: card.cost || 0,
+                    ataque: card.attack || 0,
+                    attack: card.attack || 0,
+                    vida: card.health || 0,
+                    health: card.health || 0,
+                    rareza: card.rarity || 'Common',
+                    rarity: card.rarity || 'Common',
+                    imagePath: card.image || null,
+                    image: card.image || null,
+                    color: card.color || getColorByRarity(card.rarity),
+                    effects: card.effects || [],
+                    arrows: card.arrows || [],
+                }));
+                
+                filteredCards = [...allCards];
+                actualizarCatalogoCartas();
+            } catch (error) {
+                console.error('Error al cargar las cartas:', error);
+                catalogoElement.innerHTML = `<p style="color: red">Error al cargar cartas: ${error.message}</p>`;
+            }
+        }
+
+        // Función para obtener una representación legible del tipo de carta
+        function getTipoDisplay(type) {
+            const tipoMap = {
+                'unit': 'Unit',
+                'spell': 'Spell',
+                'legend': 'Legend'
+            };
+            return tipoMap[type] || type;
+        }
+
+        // Función para filtrar las cartas según búsqueda y filtro de tipo
+        function filtrarCartas() {
+            const textoBusqueda = document.getElementById('buscarCartas').value.toLowerCase();
+            const filtroTipo = document.getElementById('filtroTipo').value;
+            
+            filteredCards = allCards.filter(card => {
+                const coincideTexto = card.name.toLowerCase().includes(textoBusqueda) || 
+                                    (card.description && card.description.toLowerCase().includes(textoBusqueda));
+                const coincideTipo = filtroTipo ? card.type === filtroTipo : true;
+                return coincideTexto && coincideTipo;
+            });
+            
+            actualizarCatalogoCartas();
+        }
+
+        // Función para actualizar la vista del catálogo de cartas
+        function actualizarCatalogoCartas() {
+            const catalogoElement = document.getElementById('catalogoCartas');
+            
+            if (filteredCards.length === 0) {
+                catalogoElement.innerHTML = '<p>No se encontraron cartas.</p>';
+                return;
+            }
+            
+            catalogoElement.innerHTML = filteredCards.map(card => `
+                <div style="background-color: #f5f5f5; padding: 10px; margin: 5px 0; border-radius: 3px; display: flex; justify-content: space-between; align-items: center; ${card.color ? `border-left: 4px solid ${card.color};` : ''}">
+                    <div>
+                        <strong>${card.name}</strong> (${card.type})
+                        <br><small>${card.rarity} - Cost: ${card.cost}</small>
+                        ${card.type === 'unit' ? `<br><small>ATK: ${card.attack} / HP: ${card.health}</small>` : ''}
+                    </div>
+                    <div>
+                        <button onclick="agregarCartaABaraja(1, ${card.id})" style="background-color: #4CAF50; margin-right: 5px;">+ Deck 1</button>
+                        <button onclick="agregarCartaABaraja(2, ${card.id})" style="background-color: #2196F3;">+ Deck 2</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Función para agregar una carta al mazo seleccionado
+        function agregarCartaABaraja(jugador, cardId) {
+            const cardToAdd = { ...allCards.find(c => c.id === cardId) };
+            
+            if (!cardToAdd) {
+                console.error('Card not found with ID:', cardId);
+                return;
+            }
+            
+            // Añadir un identificador único para la instancia de la carta en el mazo
+            cardToAdd.instanceId = Date.now() + Math.floor(Math.random() * 1000);
+            
+            if (jugador === 1) {
+                deck1Cards.push(cardToAdd);
+            } else {
+                deck2Cards.push(cardToAdd);
+            }
+            
+            actualizarVistaBarajas();
+        }
+        
+        // Función para limpiar baraja 1
+        function limpiarBaraja1() {
+            if (confirm('¿Estás seguro de querer eliminar todas las cartas del mazo 1?')) {
+                deck1Cards = [];
+                actualizarVistaBarajas();
+            }
+        }
+        
+        // Función para limpiar baraja 2
+        function limpiarBaraja2() {
+            if (confirm('¿Estás seguro de querer eliminar todas las cartas del mazo 2?')) {
+                deck2Cards = [];
+                actualizarVistaBarajas();
+            }
+        }
+        
+        // Función para actualizar la vista de barajas
+        function actualizarVistaBarajas() {
+            const deck1Container = document.getElementById('deck1Cards');
+            deck1Container.innerHTML = deck1Cards.map(card => `
+                <div style="background-color: #f5f5f5; padding: 10px; margin: 5px 0; border-radius: 3px; display: flex; justify-content: space-between; align-items: center; ${card.color ? `border-left: 4px solid ${card.color};` : ''}">
+                    <div>
+                        <strong>${card.name}</strong> (${card.type})
+                        <br><small>ID: ${card.id} - ${card.rarity} - Cost: ${card.cost}</small>
+                        ${card.type === 'unit' ? `<br><small>ATK: ${card.attack} / HP: ${card.health}</small>` : ''}
+                        ${card.effects && card.effects.length > 0 ? `<br><small>Effects: ${card.effects.length}</small>` : ''}
+                    </div>
+                    <button onclick="quitarCartaBaraja1(${card.instanceId})" style="background-color: #f44336; padding: 2px 8px; height: 30px;">✖</button>
+                </div>
+            `).join('');
+            
+            const deck2Container = document.getElementById('deck2Cards');
+            deck2Container.innerHTML = deck2Cards.map(card => `
+                <div style="background-color: #f5f5f5; padding: 10px; margin: 5px 0; border-radius: 3px; display: flex; justify-content: space-between; align-items: center; ${card.color ? `border-left: 4px solid ${card.color};` : ''}">
+                    <div>
+                        <strong>${card.name}</strong> (${card.type})
+                        <br><small>ID: ${card.id} - ${card.rarity} - Cost: ${card.cost}</small>
+                        ${card.type === 'unit' ? `<br><small>ATK: ${card.attack} / HP: ${card.health}</small>` : ''}
+                        ${card.effects && card.effects.length > 0 ? `<br><small>Effects: ${card.effects.length}</small>` : ''}
+                    </div>
+                    <button onclick="quitarCartaBaraja2(${card.instanceId})" style="background-color: #f44336; padding: 2px 8px; height: 30px;">✖</button>
+                </div>
+            `).join('');
+        }
+        
+        // Función para quitar una carta de la baraja 1
+        function quitarCartaBaraja1(instanceId) {
+            deck1Cards = deck1Cards.filter(card => card.instanceId !== instanceId);
+            actualizarVistaBarajas();
+        }
+        
+        // Función para quitar una carta de la baraja 2
+        function quitarCartaBaraja2(instanceId) {
+            deck2Cards = deck2Cards.filter(card => card.instanceId !== instanceId);
+            actualizarVistaBarajas();
+        }
+        
+        // Función para obtener color basado en rareza
+        function getColorByRarity(rarity) {
+            switch (rarity) {
+                case 'Comun': return '#8e9ba9'; // Bluish gray
+                case 'Rara': return '#4fc3f7'; // Purple
+                case 'Epica': return '#7e57c2'; // Orange
+                case 'Legendaria': return '#ffd700'; // Gold
+                default: return '#33a8ff'; // Default blue
+            }
+        }
+
+        // Función para generar el formato JSON de barajas para jugadores
+        function generateDeckFormat() {
+            const deck1Name = document.getElementById('deck1Name').value || "Baraja 1";
+            const deck2Name = document.getElementById('deck2Name').value || "Baraja 2";
+            
+            // Formatear las cartas para incluir los datos en el formato exacto requerido
+            const formatDeckCards = (cards) => {
+                return cards.map(card => {
+                     const effects = card.effects && card.effects.length > 0 
+                    ? card.effects.map(effect => ({
+                        id: effect.id || effect.effectId,
+                        name: effect.name || 'Sin nombre',
+                        description: effect.description || 'Sin descripción',
+                        amount: effect.amount || 1,
+                        target: effect.target || null,
+                        duration: effect.duration || null,
+                        repeatable: effect.repeatable || false,
+                        trigger: effect.trigger || null
+                    }))
+                    : [];
+                    
+                    // Creamos un array de flechas/movimientos
+                    const arrows = card.arrows || [];
+                    
+                    // Objeto de carta con el formato requerido
+                    return {
+                        id: card.id,
+                        type: card.type,
+                        name: card.name || 'Unnamed',
+                        rarity: card.rarity || 'Common',
+                        attack: card.attack,
+                        health: card.health,
+                        cost: card.cost,
+                        actions: null, // No tenemos este dato en nuestra vista actual
+                        effects: effects,
+                        arrows: arrows,
+                    };
+                });
+            };
+            
+            // Formato requerido exactamente
+            const formatoPartida = {
+                decks: [
+                    {
+                        name: deck1Name,
+                        cards: formatDeckCards(deck1Cards)
+                    },
+                    {
+                        name: deck2Name,
+                        cards: formatDeckCards(deck2Cards)
+                    }
+                ]
+            };
+            
+            // Mostrar el formato JSON
+            showResponse('formatoBarajasResponse', formatoPartida);
+            
+            // También en consola para facilitar la copia
+            console.log('Formato JSON para partida:');
+            console.log(JSON.stringify(formatoPartida, null, 2));
+            
+            return formatoPartida;
+        }
+
+        // GET /api/barajas
+        async function testGetBarajas() {
+            const responseElement = document.getElementById('getBarajasResponse');
+            responseElement.style.display = 'block';
+            responseElement.innerHTML = '<p>Cargando...</p>';
+            
+            try {
+                console.log('Solicitando todas las barajas...');
+                const response = await fetch(`${API_BASE_URL}/barajas`);
+                console.log('Respuesta recibida:', response.status, response.statusText);
+                
+                try {
+                    const data = await response.json();
+                    console.log('Datos recibidos:', data);
+                    showResponse('getBarajasResponse', data);
+                } catch (jsonError) {
+                    console.error('Error al procesar JSON:', jsonError);
+                    
+                    // Intentar leer como texto
+                    const text = await response.clone().text();
+                    showResponse('getBarajasResponse', {
+                        error: 'Error al procesar JSON',
+                        message: jsonError.message,
+                        responseText: text
+                    }, true);
+                }
+            } catch (error) {
+                console.error('Error de red:', error);
+                showResponse('getBarajasResponse', {
+                    error: 'Error de red',
+                    message: error.message
+                }, true);
+            }
+        }
+
+        // GET /api/usuarios/:userId/barajas
+        async function testGetUserBarajas() {
+            const userId = document.getElementById('getUserBarajasId').value;
+            const responseElement = document.getElementById('getUserBarajasResponse');
+            responseElement.style.display = 'block';
+            responseElement.innerHTML = '<p>Cargando...</p>';
+            
+            try {
+                console.log(`Solicitando barajas del usuario ${userId}...`);
+                const response = await fetch(`${API_BASE_URL}/usuarios/${userId}/barajas`);
+                console.log('Respuesta recibida:', response.status, response.statusText);
+                
+                try {
+                    const data = await response.json();
+                    console.log('Datos recibidos:', data);
+                    showResponse('getUserBarajasResponse', data);
+                } catch (jsonError) {
+                    console.error('Error al procesar JSON:', jsonError);
+                    
+                    // Intentar leer como texto
+                    const text = await response.clone().text();
+                    showResponse('getUserBarajasResponse', {
+                        error: 'Error al procesar JSON',
+                        message: jsonError.message,
+                        responseText: text
+                    }, true);
+                }
+            } catch (error) {
+                console.error('Error de red:', error);
+                showResponse('getUserBarajasResponse', {
+                    error: 'Error de red',
+                    message: error.message
+                }, true);
+            }
+        }
+
+        // GET /api/barajas/:id
+        async function testGetBaraja() {
+            const id = document.getElementById('getBarajaId').value;
+            const responseElement = document.getElementById('getBarajaResponse');
+            responseElement.style.display = 'block';
+            responseElement.innerHTML = '<p>Cargando...</p>';
+            
+            try {
+                console.log(`Solicitando baraja con ID ${id}...`);
+                const response = await fetch(`${API_BASE_URL}/barajas/${id}`);
+                console.log('Respuesta recibida:', response.status, response.statusText);
+                
+                try {
+                    const data = await response.json();
+                    console.log('Datos recibidos:', data);
+                    showResponse('getBarajaResponse', data);
+                } catch (jsonError) {
+                    console.error('Error al procesar JSON:', jsonError);
+                    
+                    // Intentar leer como texto
+                    const text = await response.clone().text();
+                    showResponse('getBarajaResponse', {
+                        error: 'Error al procesar JSON',
+                        message: jsonError.message,
+                        responseText: text
+                    }, true);
+                }
+            } catch (error) {
+                console.error('Error de red:', error);
+                showResponse('getBarajaResponse', {
+                    error: 'Error de red',
+                    message: error.message
+                }, true);
+            }
+        }
+
+        // GET /api/barajas/:id/cartas
+        async function testGetCartasBaraja() {
+            const id = document.getElementById('getCartasBarajaId').value;
+            const responseElement = document.getElementById('getCartasBarajaResponse');
+            responseElement.style.display = 'block';
+            responseElement.innerHTML = '<p>Cargando...</p>';
+            
+            try {
+                console.log(`Solicitando cartas de la baraja con ID ${id}...`);
+                const response = await fetch(`${API_BASE_URL}/barajas/${id}/cartas`);
+                console.log('Respuesta recibida:', response.status, response.statusText);
+                
+                try {
+                    const data = await response.json();
+                    console.log('Datos recibidos:', data);
+                    showResponse('getCartasBarajaResponse', data);
+                } catch (jsonError) {
+                    console.error('Error al procesar JSON:', jsonError);
+                    
+                    // Intentar leer como texto
+                    const text = await response.clone().text();
+                    showResponse('getCartasBarajaResponse', {
+                        error: 'Error al procesar JSON',
+                        message: jsonError.message,
+                        responseText: text
+                    }, true);
+                }
+            } catch (error) {
+                console.error('Error de red:', error);
+                showResponse('getCartasBarajaResponse', {
+                    error: 'Error de red',
+                    message: error.message
+                }, true);
+            }
+        }
+// ################################################################
+        // POST /api/barajas
+        async function testCreateBaraja() {
+            const userId = document.getElementById('createBarajaUserId').value;
+            const name = document.getElementById('createBarajaName').value;
+            const sleevePath = document.getElementById('createBarajaSleevePath').value;
+            
+            const responseElement = document.getElementById('createBarajaResponse');
+            responseElement.style.display = 'block';
+            responseElement.innerHTML = '<p>Cargando...</p>';
+            
+            try {
+                console.log('Creando nueva baraja...');
+                const response = await fetch(`${API_BASE_URL}/barajas`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId: parseInt(userId),
+                        name: name,
+                        sleevePath: sleevePath || null
+                    })
+                });
+                console.log('Respuesta recibida:', response.status, response.statusText);
+                
+                try {
+                    const data = await response.json();
+                    console.log('Datos recibidos:', data);
+                    showResponse('createBarajaResponse', data);
+                } catch (jsonError) {
+                    console.error('Error al procesar JSON:', jsonError);
+                    
+                    // Intentar leer como texto
+                    const text = await response.clone().text();
+                    showResponse('createBarajaResponse', {
+                        error: 'Error al procesar JSON',
+                        message: jsonError.message,
+                        responseText: text
+                    }, true);
+                }
+            } catch (error) {
+                console.error('Error de red:', error);
+                showResponse('createBarajaResponse', {
+                    error: 'Error de red',
+                    message: error.message
+                }, true);
+            }
+        }
+// ################################################################
+        // DELETE /api/barajas/:id
+        async function testDeleteBaraja() {
+            const id = document.getElementById('deleteBarajaId').value;
+            
+            if (!id) {
+                alert('Por favor ingresa un ID de baraja válido');
+                return;
+            }
+            
+            if (!confirm(`¿Estás seguro de eliminar la baraja ${id}?`)) {
+                return;
+            }
+            
+            const responseElement = document.getElementById('deleteBarajaResponse');
+            responseElement.style.display = 'block';
+            responseElement.innerHTML = '<p>Cargando...</p>';
+            
+            try {
+                console.log(`Eliminando baraja con ID ${id}...`);
+                const response = await fetch(`${API_BASE_URL}/barajas/${id}`, {
+                    method: 'DELETE'
+                });
+                console.log('Respuesta recibida:', response.status, response.statusText);
+                
+                try {
+                    const data = await response.json();
+                    console.log('Datos recibidos:', data);
+                    showResponse('deleteBarajaResponse', data);
+                } catch (jsonError) {
+                    console.error('Error al procesar JSON:', jsonError);
+                    
+                    // Intentar leer como texto
+                    const text = await response.clone().text();
+                    showResponse('deleteBarajaResponse', {
+                        error: 'Error al procesar JSON',
+                        message: jsonError.message,
+                        responseText: text
+                    }, true);
+                }
+            } catch (error) {
+                console.error('Error de red:', error);
+                showResponse('deleteBarajaResponse', {
+                    error: 'Error de red',
+                    message: error.message
+                }, true);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Flechas - API Cartas</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        button {
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: none;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #statusContainer {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            text-align: center;
+            display: none;
+        }
+        .status-success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+        .status-error {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+        .cards-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 15px;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .card-id {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .card-type {
+            background-color: #f0f0f0;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+        .card-name {
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        .movement-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 80px);
+            grid-template-rows: repeat(3, 40px);
+            gap: 3px;
+            margin: 15px auto;
+            max-width: 260px;
+        }
+        .grid-cell {
+            width: 80px;
+            height: 40px;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 10px;
+            border-radius: 4px;
+            position: relative;
+            text-align: center;
+            word-break: break-word;
+            padding: 2px;
+        }
+        .grid-cell.active {
+            background-color: #4CAF50;
+            color: white;
+            animation: pulse 1.5s infinite alternate;
+        }
+        .grid-cell.center {
+            background-color: #2196F3;
+            color: white;
+        }
+        @keyframes pulse {
+            0% {
+                opacity: 0.8;
+                transform: scale(0.95);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        .flechas-raw {
+            background-color: #f9f9f9;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: #666;
+        }
+        .section-title {
+            font-weight: bold;
+            margin: 15px 0 5px 0;
+            font-size: 14px;
+            color: #333;
+        }
+        .direction-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 10px;
+        }
+        .direction-tag {
+            background-color: #e0f7fa;
+            color: #006064;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Visualizador de Flechas - Cartas</h1>
+    
+    <div class="controls">
+        <button id="refreshButton">Cargar cartas</button>
+        <button id="showRawButton">Mostrar datos crudos</button>
+        <button id="analyzeButton">Analizar flechas</button>
+    </div>
+    
+    <div id="statusContainer"></div>
+    
+    <div id="analysisContainer" style="display: none; margin: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 8px;">
+        <h3>Análisis de Flechas</h3>
+        <div id="analysisContent"></div>
+    </div>
+    
+    <div id="cardsContainer" class="cards-container">
+        <div class="loading">Haz clic en "Cargar cartas" para empezar</div>
+    </div>
+    
+    <script>
+        // URL de la API
+        const API_URL = 'http://localhost:3030/api/cards';
+        
+        // Elementos del DOM
+        const cardsContainer = document.getElementById('cardsContainer');
+        const refreshButton = document.getElementById('refreshButton');
+        const showRawButton = document.getElementById('showRawButton');
+        const statusContainer = document.getElementById('statusContainer');
+        
+        // Estado de la aplicación
+        let allCards = [];
+        let showRawData = false;
+        
+        // Mapeo de tipos para mostrar el nombre completo
+        const typeNames = {
+            'P': 'Personaje',
+            'A': 'Aliado',
+            'H': 'Hechizo',
+            'O': 'Objeto'
+        };
+        
+        // Función para obtener cartas de la API
+        async function fetchCards() {
+            showStatus('Cargando cartas...', 'info');
+            cardsContainer.innerHTML = '<div class="loading">Cargando cartas desde la base de datos...</div>';
+            
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+                
+                const cards = await response.json();
+                allCards = cards;
+                
+                // Filtrar las cartas que tienen flechas en cualquiera de los formatos posibles
+                const cartasConFlechas = cards.filter(card => {
+                    // 1. Verificar si hay flechas directamente en la propiedad "flechas"
+                    if (card.flechas && Array.isArray(card.flechas) && card.flechas.length > 0) {
+                        return true;
+                    }
+                    
+                    // 2. Verificar si hay flechas en la propiedad "movements"
+                    if (card.movements && Array.isArray(card.movements) && card.movements.length > 0) {
+                        return true;
+                    }
+                    
+                    // 3. Verificar si hay flechas dentro de los efectos
+                    if (card.efectos && Array.isArray(card.efectos)) {
+                        return card.efectos.some(e => {
+                            // Buscar flechas como string o como array
+                            return (e && e.Flechas) || 
+                                   (e && e.flechas && Array.isArray(e.flechas) && e.flechas.length > 0);
+                        });
+                    }
+                    
+                    return false;
+                });
+                
+                console.log(`Total de cartas: ${cards.length}, Cartas con flechas: ${cartasConFlechas.length}`);
+                
+                if (cartasConFlechas.length > 0) {
+                    showStatus(`Se encontraron ${cartasConFlechas.length} cartas con flechas`, 'success');
+                    renderCardsFlechas(cartasConFlechas);
+                    
+                    // Depuración: mostrar los formatos encontrados
+                    console.log("Ejemplos de formatos de flechas encontrados:");
+                    
+                    const muestraFormatos = cartasConFlechas.slice(0, 5).map(card => {
+                        let formatoInfo = {
+                            id: card.id || card.IdCarta,
+                            nombre: card.name || card.Nombre,
+                            formatoFlechas: card.flechas ? "Propiedad 'flechas'" : 
+                                            card.movements ? "Propiedad 'movements'" : 
+                                            "En efectos"
+                        };
+                        
+                        // Añadir una muestra del formato real
+                        if (card.flechas) {
+                            formatoInfo.ejemplo = card.flechas[0];
+                        } else if (card.movements) {
+                            formatoInfo.ejemplo = card.movements[0];
+                        } else if (card.efectos) {
+                            const efectoConFlecha = card.efectos.find(e => e.Flechas || e.flechas);
+                            if (efectoConFlecha) {
+                                formatoInfo.ejemplo = efectoConFlecha.Flechas || efectoConFlecha.flechas;
+                            }
+                        }
+                        
+                        return formatoInfo;
+                    });
+                    
+                    console.log(muestraFormatos);
+                } else {
+                    showStatus('No se encontraron cartas con flechas en ningún formato', 'error');
+                    cardsContainer.innerHTML = `
+                        <div style="grid-column: 1 / -1; text-align: center; padding: 50px;">
+                            <h2>No hay flechas</h2>
+                            <p>Ninguna carta tiene información de flechas/movimientos.</p>
+                            <p>Verifica la estructura de los datos en la base de datos.</p>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('Error al cargar las cartas:', error);
+                showStatus(`Error al cargar las cartas: ${error.message}`, 'error');
+                cardsContainer.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 50px;">
+                        <h2>Error al cargar las cartas</h2>
+                        <p>${error.message}</p>
+                        <button onclick="fetchCards()">Reintentar</button>
+                    </div>
+                `;
+            }
+        }
+        
+        // Función para renderizar las cartas con flechas
+        function renderCardsFlechas(cards) {
+            if (cards.length === 0) {
+                cardsContainer.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 50px;">
+                        <h2>No se encontraron cartas con flechas</h2>
+                    </div>
+                `;
+                return;
+            }
+            
+            cardsContainer.innerHTML = cards.map(card => {
+                // Preparamos la información de flechas, buscando en diferentes lugares donde podrían estar almacenadas
+                let flechas = [];
+                
+                // Verificar si los datos están en card.efectos (que es donde están según tu log)
+                if (card.efectos && Array.isArray(card.efectos)) {
+                    console.log(`Carta ${card.id || card.IdCarta}: Efectos encontrados:`, card.efectos);
+                    
+                    // Extraer flechas de los efectos
+                    const flechasDesdeEfectos = [];
+                    card.efectos.forEach(efecto => {
+                        if (efecto && efecto.Flechas) {
+                            flechasDesdeEfectos.push({
+                                direction: efecto.Flechas,
+                                targetType: efecto.Objetivo || 'Enemigo',
+                                fromEffect: efecto.Nombre || 'Desconocido'
+                            });
+                        }
+                    });
+                    
+                    if (flechasDesdeEfectos.length > 0) {
+                        flechas = flechasDesdeEfectos;
+                        console.log(`Carta ${card.id || card.IdCarta}: Flechas extraídas de efectos:`, flechas);
+                    }
+                }
+                
+                // Si no se encontraron en efectos, probar otras ubicaciones
+                if (flechas.length === 0) {
+                    if (card.flechas && Array.isArray(card.flechas) && card.flechas.length > 0) {
+                        flechas = card.flechas;
+                        console.log(`Carta ${card.id || card.IdCarta}: Usando flechas directas`, flechas);
+                    } 
+                    else if (card.movements && Array.isArray(card.movements) && card.movements.length > 0) {
+                        flechas = card.movements;
+                        console.log(`Carta ${card.id || card.IdCarta}: Usando movements`, flechas);
+                    }
+                }
+                
+                // Depuración: mostrar exactamente qué flechas se encontraron
+                console.log(`Carta ${card.id || card.IdCarta}: Flechas finales para renderizar:`, flechas);
+                
+                // HTML para la visualización del grid
+                const movementGridHTML = renderMovementGrid(flechas);
+                
+                // HTML para mostrar los datos crudos si está activada la opción
+                const rawDataHTML = showRawData ? `
+                    <div class="section-title">Datos crudos:</div>
+                    <div class="flechas-raw">${JSON.stringify(flechas, null, 2)}</div>
+                ` : '';
+                
+                // HTML para mostrar las direcciones como tags
+                const directionsHTML = `
+                    <div class="section-title">Direcciones:</div>
+                    <div class="direction-tags">
+                        ${extractDirections(flechas).map(dir => 
+                            `<div class="direction-tag">${dir}</div>`
+                        ).join('')}
+                    </div>
+                `;
+                
+                return `
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-id">${card.type}${card.id}</span>
+                            <span class="card-type">${typeNames[card.type] || card.type}</span>
+                        </div>
+                        <div class="card-name">${card.name || 'Sin nombre'}</div>
+                        
+                        <div class="section-title">Visualización:</div>
+                        ${movementGridHTML}
+                        
+                        ${directionsHTML}
+                        ${rawDataHTML}
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Función para extraer direcciones únicas de las flechas
+        function extractDirections(flechas) {
+            const directions = new Set();
+            
+            if (Array.isArray(flechas)) {
+                flechas.forEach(f => {
+                    if (typeof f === 'string') {
+                        directions.add(f);
+                    } else if (f && f.direction) {
+                        directions.add(f.direction);
+                    } else if (f && typeof f === 'object') {
+                        // Intentar extraer dirección de cualquier propiedad que parezca relevante
+                        ['direction', 'Direction', 'direccion', 'Direccion'].forEach(prop => {
+                            if (f[prop]) directions.add(f[prop]);
+                        });
+                    }
+                });
+            } else if (typeof flechas === 'string') {
+                // Si es un string único, lo añadimos directamente
+                directions.add(flechas);
+            } else if (flechas && typeof flechas === 'object') {
+                // Podría ser un objeto con direcciones
+                Object.values(flechas).forEach(val => {
+                    if (typeof val === 'string') directions.add(val);
+                });
+            }
+            
+            return Array.from(directions);
+        }
+        
+        // Función para analizar y mostrar estadísticas de las flechas
+        function analyzeArrows(cards) {
+            if (!cards || cards.length === 0) {
+                return "No hay cartas para analizar";
+            }
+            
+            // Contadores para el análisis
+            const stats = {
+                totalCards: cards.length,
+                cardsWithArrows: 0,
+                totalArrows: 0,
+                directionsCount: {},
+                formatTypes: {
+                    string: 0,
+                    objectWithDirection: 0,
+                    other: 0
+                }
+            };
+            
+            // Recolectar todos los valores de flechas para análisis
+            const allDirections = [];
+            
+            cards.forEach(card => {
+                // Extraer flechas de la manera más inclusiva posible
+                let flechas = [];
+                
+                if (card.flechas && Array.isArray(card.flechas)) {
+                    flechas = card.flechas;
+                } else if (card.movements && Array.isArray(card.movements)) {
+                    flechas = card.movements;
+                } else if (card.efectos && Array.isArray(card.efectos)) {
+                    card.efectos.forEach(efecto => {
+                        if (efecto.Flechas) {
+                            if (typeof efecto.Flechas === 'string') {
+                                flechas.push({ direction: efecto.Flechas, fromEffect: true });
+                            } else if (Array.isArray(efecto.Flechas)) {
+                                flechas.push(...efecto.Flechas.map(f => ({ ...f, fromEffect: true })));
+                            }
+                        }
+                    });
+                }
+                
+                if (flechas && flechas.length > 0) {
+                    stats.cardsWithArrows++;
+                    stats.totalArrows += flechas.length;
+                    
+                    // Analizar cada flecha
+                    flechas.forEach(flecha => {
+                        // Determinar tipo de formato
+                        if (typeof flecha === 'string') {
+                            stats.formatTypes.string++;
+                            allDirections.push(flecha.toUpperCase());
+                            
+                            // Contar esta dirección
+                            const dir = flecha.toUpperCase();
+                            stats.directionsCount[dir] = (stats.directionsCount[dir] || 0) + 1;
+                            
+                        } else if (flecha && flecha.direction) {
+                            stats.formatTypes.objectWithDirection++;
+                            allDirections.push(flecha.direction.toUpperCase());
+                            
+                            // Contar esta dirección
+                            const dir = flecha.direction.toUpperCase();
+                            stats.directionsCount[dir] = (stats.directionsCount[dir] || 0) + 1;
+                            
+                        } else {
+                            stats.formatTypes.other++;
+                        }
+                    });
+                }
+            });
+            
+            // Preparar información para el reporte
+            let report = `
+                <div class="analysis-summary">
+                    <p><strong>Total de cartas:</strong> ${stats.totalCards}</p>
+                    <p><strong>Cartas con flechas:</strong> ${stats.cardsWithArrows} (${Math.round(stats.cardsWithArrows/stats.totalCards*100)}%)</p>
+                    <p><strong>Total de flechas:</strong> ${stats.totalArrows}</p>
+                    <p><strong>Promedio de flechas por carta:</strong> ${stats.cardsWithArrows > 0 ? (stats.totalArrows/stats.cardsWithArrows).toFixed(1) : 0}</p>
+                </div>
+                
+                <div class="analysis-formats">
+                    <h4>Formatos detectados:</h4>
+                    <ul>
+                        <li>Strings directos: ${stats.formatTypes.string}</li>
+                        <li>Objetos con propiedad "direction": ${stats.formatTypes.objectWithDirection}</li>
+                        <li>Otros formatos: ${stats.formatTypes.other}</li>
+                    </ul>
+                </div>
+            `;
+            
+            // Mostrar el conteo de cada dirección
+            if (Object.keys(stats.directionsCount).length > 0) {
+                report += `
+                    <div class="analysis-directions">
+                        <h4>Direcciones encontradas:</h4>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Dirección</th>
+                                <th style="text-align: right; padding: 8px; border-bottom: 1px solid #ddd;">Conteo</th>
+                                <th style="text-align: right; padding: 8px; border-bottom: 1px solid #ddd;">Porcentaje</th>
+                            </tr>
+                            ${Object.entries(stats.directionsCount)
+                                .sort((a, b) => b[1] - a[1])  // Ordenar por conteo descendente
+                                .map(([dir, count]) => `
+                                    <tr>
+                                        <td style="padding: 8px; border-bottom: 1px solid #eee;">${dir}</td>
+                                        <td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">${count}</td>
+                                        <td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">${Math.round(count/stats.totalArrows*100)}%</td>
+                                    </tr>
+                                `).join('')}
+                        </table>
+                    </div>
+                `;
+            }
+            
+            return report;
+        }
+        
+        // Función para renderizar el grid de movimientos
+        function renderMovementGrid(movements) {
+            console.log('renderMovementGrid recibió:', movements);
+            
+            if (!movements || movements.length === 0) {
+                console.log('No hay movimientos para renderizar');
+                return '<div class="movement-grid"><div class="grid-cell center">CENTRO</div></div>';
+            }
+            
+            // Mapeo de dirección a coordenada [row, col] y texto a mostrar
+            const directionMap = {
+                'TOP_LEFT': { pos: [0, 0], text: 'TOP_LEFT' },
+                'TOPLEFT': { pos: [0, 0], text: 'TOP_LEFT' },
+                'NW': { pos: [0, 0], text: 'NW' },
+                'NORTHWEST': { pos: [0, 0], text: 'NORTHWEST' },
+                
+                'UP': { pos: [0, 1], text: 'UP' },
+                'TOP': { pos: [0, 1], text: 'TOP' },
+                'N': { pos: [0, 1], text: 'N' },
+                'NORTH': { pos: [0, 1], text: 'NORTH' },
+                
+                'TOP_RIGHT': { pos: [0, 2], text: 'TOP_RIGHT' },
+                'TOPRIGHT': { pos: [0, 2], text: 'TOP_RIGHT' },
+                'NE': { pos: [0, 2], text: 'NE' },
+                'NORTHEAST': { pos: [0, 2], text: 'NORTHEAST' },
+                
+                'LEFT': { pos: [1, 0], text: 'LEFT' },
+                'W': { pos: [1, 0], text: 'W' },
+                'WEST': { pos: [1, 0], text: 'WEST' },
+                
+                'RIGHT': { pos: [1, 2], text: 'RIGHT' },
+                'E': { pos: [1, 2], text: 'E' },
+                'EAST': { pos: [1, 2], text: 'EAST' },
+                
+                'BOTTOM_LEFT': { pos: [2, 0], text: 'BOTTOM_LEFT' },
+                'BOTTOMLEFT': { pos: [2, 0], text: 'BOTTOM_LEFT' },
+                'SW': { pos: [2, 0], text: 'SW' },
+                'SOUTHWEST': { pos: [2, 0], text: 'SOUTHWEST' },
+                
+                'DOWN': { pos: [2, 1], text: 'DOWN' },
+                'BOTTOM': { pos: [2, 1], text: 'BOTTOM' },
+                'S': { pos: [2, 1], text: 'S' },
+                'SOUTH': { pos: [2, 1], text: 'SOUTH' },
+                
+                'BOTTOM_RIGHT': { pos: [2, 2], text: 'BOTTOM_RIGHT' },
+                'BOTTOMRIGHT': { pos: [2, 2], text: 'BOTTOM_RIGHT' },
+                'SE': { pos: [2, 2], text: 'SE' },
+                'SOUTHEAST': { pos: [2, 2], text: 'SOUTHEAST' }
+            };
+            
+            // Extraer las direcciones específicas de esta carta
+            const cardDirections = new Map(); // Usamos Map para guardar dirección y texto
+            
+            movements.forEach((m, index) => {
+                console.log(`Procesando movimiento ${index}:`, m);
+                let direction = null;
+                
+                if (typeof m === 'string') {
+                    direction = m.toUpperCase();
+                    console.log(`Movimiento ${index} es string: ${direction}`);
+                } else if (m && typeof m === 'object') {
+                    if (m.direction) {
+                        direction = m.direction.toUpperCase();
+                        console.log(`Movimiento ${index} tiene propiedad direction: ${direction}`);
+                    }
+                    else if (m.Direction) {
+                        direction = m.Direction.toUpperCase();
+                        console.log(`Movimiento ${index} tiene propiedad Direction: ${direction}`);
+                    }
+                    else if (m.direccion) {
+                        direction = m.direccion.toUpperCase();
+                        console.log(`Movimiento ${index} tiene propiedad direccion: ${direction}`);
+                    }
+                    else if (m.Direccion) {
+                        direction = m.Direccion.toUpperCase();
+                        console.log(`Movimiento ${index} tiene propiedad Direccion: ${direction}`);
+                    }
+                    else {
+                        console.log(`Movimiento ${index} es objeto pero no tiene propiedad de dirección reconocida:`, Object.keys(m));
+                    }
+                }
+                
+                if (direction && directionMap[direction]) {
+                    const { pos, text } = directionMap[direction];
+                    const cellKey = `${pos[0]}-${pos[1]}`;
+                    cardDirections.set(cellKey, text);
+                    console.log(`Dirección ${direction} mapeada a posición ${cellKey} con texto ${text}`);
+                } else if (direction) {
+                    console.warn(`Dirección ${direction} no encontrada en directionMap`);
+                }
+            });
+            
+            console.log('Direcciones de carta procesadas:', cardDirections);
+            
+            // Si no se encontraron direcciones válidas, mostrar advertencia
+            if (cardDirections.size === 0) {
+                console.warn('No se encontraron direcciones válidas para esta carta:', movements);
+                return `<div class="movement-grid">
+                    <div class="grid-cell center">CENTRO</div>
+                    <div style="font-size: 12px; color: #e65100; margin-top: 5px;">
+                        ⚠️ Formato de direcciones no reconocido
+                    </div>
+                </div>`;
+            }
+            
+            // Generar el HTML del grid
+            let gridHTML = '<div class="movement-grid">';
+            
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    const cellKey = `${i}-${j}`;
+                    
+                    if (i === 1 && j === 1) {
+                        // Celda central
+                        gridHTML += `<div class="grid-cell center">CENTRO</div>`;
+                    } else if (cardDirections.has(cellKey)) {
+                        // Celda con dirección activa - mostrar el texto de la dirección
+                        const directionText = cardDirections.get(cellKey);
+                        gridHTML += `<div class="grid-cell active" title="${directionText}">${directionText}</div>`;
+                        console.log(`Celda ${cellKey} será activa con texto: ${directionText}`);
+                    } else {
+                        // Celda inactiva - vacía
+                        gridHTML += `<div class="grid-cell"></div>`;
+                    }
+                }
+            }
+            
+            gridHTML += '</div>';
+            console.log('Grid HTML generado:', gridHTML);
+            return gridHTML;
+        }
+        
+        // Función para mostrar mensajes de estado
+        function showStatus(message, type) {
+            statusContainer.textContent = message;
+            statusContainer.className = '';
+            statusContainer.classList.add(`status-${type}`);
+            statusContainer.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusContainer.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        // Event listeners
+        refreshButton.addEventListener('click', fetchCards);
+        
+        showRawButton.addEventListener('click', () => {
+            showRawData = !showRawData;
+            showRawButton.textContent = showRawData ? 'Ocultar datos crudos' : 'Mostrar datos crudos';
+            if (allCards.length > 0) {
+                // Filtrar cartas con flechas de manera más inclusiva
+                const cartasConFlechas = allCards.filter(card => 
+                    (card.flechas && Array.isArray(card.flechas) && card.flechas.length > 0) ||
+                    (card.movements && Array.isArray(card.movements) && card.movements.length > 0) ||
+                    (card.efectos && Array.isArray(card.efectos) && 
+                        card.efectos.some(e => e.Flechas || (e.flechas && e.flechas.length > 0)))
+                );
+                renderCardsFlechas(cartasConFlechas);
+            }
+        });
+        
+        // Event listener para el análisis de flechas
+        const analyzeButton = document.getElementById('analyzeButton');
+        const analysisContainer = document.getElementById('analysisContainer');
+        const analysisContent = document.getElementById('analysisContent');
+        
+        analyzeButton.addEventListener('click', () => {
+            if (allCards.length === 0) {
+                showStatus('Primero debes cargar las cartas', 'error');
+                return;
+            }
+            
+            // Cambiar estado de visualización del análisis
+            const isVisible = analysisContainer.style.display !== 'none';
+            
+            if (isVisible) {
+                analysisContainer.style.display = 'none';
+                analyzeButton.textContent = 'Analizar flechas';
+            } else {
+                // Ejecutar análisis y mostrar resultados
+                const analysisReport = analyzeArrows(allCards);
+                analysisContent.innerHTML = analysisReport;
+                analysisContainer.style.display = 'block';
+                analyzeButton.textContent = 'Ocultar análisis';
+            }
+        });
+    </script>
+</body>
+</html>

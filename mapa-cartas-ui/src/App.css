@@ -75,7 +75,7 @@
 
 .game-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 12px rgba(146, 36, 36, 0.856);
 }
 
 .card-content {

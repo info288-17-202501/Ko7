@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Cartas - API</title>
+</head>
+<body>
+    <div id="cardsContainer" class="cards-container">
+        <div class="loading">Cargando cartas desde la base de datos...</div>
+    </div>
+    
+    <script>
+        // Función para obtener cartas de la API
+async function fetchCards() {
+    const API_URL = 'http://localhost:3030/api/cards';
+    try {
+        const response = await fetch(API_URL);
+        const cards = await response.json();
+
+        // Iterar sobre las cartas y sus efectos
+
+        //const imagenes = cards.map(card => card.image);
+        //console.log(imagenes);
+
+        cards.forEach(card => {
+    console.log(`Card ID: ${card.id}, Type: ${card.type}, Name: ${card.attack}, Health: ${card.health}, Cost: ${card.cost}`);
+});
+        cards.forEach(card => {
+            console.log(`Carta: ${card.name}`);
+            if (card.effects && card.effects.length > 0) {
+                card.effects.forEach(effect => {
+                    console.log(`  Descripción del efecto: ${effect.amount}`);
+                });
+            } else {
+                console.log('  Sin efectos');
+            }
+        });
+    } catch (error) {
+        console.error('Error al cargar las cartas:', error);
+    }
+}
+
+// Llamar a la función para cargar las cartas
+fetchCards();
+    </script>
+</body>
+</html>

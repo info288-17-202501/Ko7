@@ -1,8 +1,39 @@
 import React from "react";
 import ReactDOM from "react-dom";
+import './styles/animations.css'; // Asegúrate de que el CSS esté correctamente importado
 
 // Gestión global de qué carta está mostrando su descripción
 let activeCardId = null;
+
+const getColorByRarity = (rarity) => {
+  switch(rarity) {
+    case 'Común': return '#8e9ba9'; // Gris azulado
+    case 'Rara': return '#7e57c2'; // Morado
+    case 'Épica': return '#ff9800'; // Naranja
+    case 'Legendaria': return '#ffd700'; // Dorado
+    default: return '#33a8ff'; // Azul por defecto
+  }
+};
+
+const getRarityClass = (rarity) => {
+  switch(rarity) {
+    case 'Común': return 'card-rarity-comun';
+    case 'Rara': return 'card-rarity-rara';
+    case 'Épica': return 'card-rarity-epica';
+    case 'Legendaria': return 'card-rarity-legendaria';
+    default: return 'card-rarity-comun';
+  }
+};
+
+const getRarityBorderClass = (rarity) => {
+  switch(rarity) {
+    case 'Común': return 'offsetBorder';
+    case 'Rara': return 'border-rarity-rara';
+    case 'Épica': return 'border-rarity-epica';
+    case 'Legendaria': return 'border-rarity-legendaria';
+    default: return 'border-rarity-comun';
+  }
+};
 
 class Card extends React.Component {
   constructor(props) {
@@ -20,14 +51,7 @@ class Card extends React.Component {
       document.removeEventListener('card-activated', this.handleCardActivated);
     }
   }
-  handleMouseEnter = () => {
-    // Al pasar el ratón sobre la carta, la marcamos como hover y mostramos su descripción si tiene una
-    this.setState({ isHovered: true });
-  };
 
-  handleMouseLeave = () => {
-    this.setState({ isHovered: false });
-  };
   handleClick = (e) => {
     // Vamos a permitir que el clic llegue al hexágono si la carta está en el tablero
     const isInBoard = this.props.isSmall && this.props.inBoard;
@@ -50,6 +74,10 @@ class Card extends React.Component {
       document.dispatchEvent(new CustomEvent('card-activated', { 
         detail: { cardId: this.props.id } 
       }));
+    }
+
+    if (this.props.onCardClick) {
+      this.props.onCardClick(this.props);
     }
   };
 
@@ -98,6 +126,22 @@ class Card extends React.Component {
     }
   }
 
+  handleMouseEnter = () => {
+    this.setState({ isHovered: true });
+    // Notificar al componente padre sobre el hover
+    if (this.props.onCardHover) {
+      this.props.onCardHover(this.props);
+    }
+  };
+
+  handleMouseLeave = () => {
+    this.setState({ isHovered: false });
+    // Notificar al componente padre que el hover terminó
+    if (this.props.onCardLeave) {
+      this.props.onCardLeave();
+    }
+  };
+
   componentWillUnmount() {
     // Limpieza al desmontar
     document.removeEventListener('click', this.handleGlobalClick);
@@ -143,102 +187,27 @@ class Card extends React.Component {
         ? 'translateX(-50%)' // Si está abajo, solo centrar horizontalmente
         : 'translateX(-50%) translateY(-100%)'; // Si está arriba, mover hacia arriba
 
+    
     const stats = this.props.stats || {};
     const hasAttack = stats.attack !== undefined;
     const hasHealth = stats.health !== undefined;
     const hasCost = stats.cost !== undefined;
     const hasActions = stats.actions !== undefined;
-
-    return ReactDOM.createPortal(
-      <span 
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'fixed',
-          top: `${topPosition}px`,
-          left: `${leftPosition}px`,
-          transform: transform,
-          backgroundColor: 'rgba(0, 0, 0, 0.9)',
-          color: 'white',
-          padding: '15px',
-          borderRadius: '8px',
-          width: '250px',
-          maxHeight: '300px',
-          fontSize: '15px',
-          zIndex: 10000,
-          boxShadow: '0 5px 15px rgba(0,0,0,0.5)',
-          textAlign: 'left',
-          pointerEvents: 'auto',
-          overflowY: 'auto',
-          lineHeight: '1.4',
-          display: 'block',
-          opacity: 1,
-          visibility: 'visible'
-        }}
-      >
-        <span style={{ 
-          fontWeight: 'bold', 
-          marginBottom: '8px',
-          fontSize: '16px',
-          textAlign: 'center',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.3)',
-          paddingBottom: '6px',
-          display: 'block'
-        }}>
-          {this.props.name}
-        </span>
-        <span style={{ 
-          fontSize: '16px', 
-          color: '#aaa', 
-          marginBottom: '10px',
-          textAlign: 'center',
-          display: 'block'
-        }}>
-          {this.props.rarity} • {this.props.type}
-        </span>
-        <div style={{
-          marginTop: '10px',
-          display: 'flex',
-          justifyContent: 'space-around',
-          flexWrap: 'wrap'
-        }}>
-          {hasAttack && (
-            <div style={{ textAlign: 'center' }}>
-              <span style={{ fontSize: '24px' }}>⚔️</span>
-              <span style={{ fontSize: '18px' }}>{stats.attack}</span>
-            </div>
-          )}
-          {hasHealth && (
-            <div style={{ textAlign: 'center' }}>
-              <span style={{ fontSize: '24px' }}>❤️</span>
-              <span style={{ fontSize: '18px' }}>{stats.health}</span>
-            </div>
-          )}
-          {hasCost && (
-            <div style={{ textAlign: 'center' }}>
-              <span style={{ fontSize: '24px' }}>💎</span>
-              <span style={{ fontSize: '18px' }}>{stats.cost}</span>
-            </div>
-          )}
-          {hasActions && (
-            <div style={{ textAlign: 'center' }}>
-              <span style={{ fontSize: '24px' }}>🏃</span>
-              <span style={{ fontSize: '18px' }}>{stats.actions}</span>
-            </div>
-          )}
-        </div>
-        <div style={{ marginTop: '10px', textAlign: 'justify' }}>
-          {this.props.description || <em style={{ color: '#aaa' }}>Sin descripción disponible</em>}
-        </div>
-      </span>,
-      this.portalRoot
-    );
+    
   }
 
   render() {
     const { isHovered, isDescriptionVisible } = this.state;
     const scale = isHovered ? 1.1 : 1;
     const isSmall = this.props.isSmall;
-    
+
+    const rarity = this.props.rarity || "Común";
+    const border = this.props.border || "1px solid #333";
+  
+    const rarityClass = getRarityClass(rarity);
+    const baseColor = getColorByRarity(rarity);
+    const borderClass = getRarityBorderClass(rarity);
+
     return (
       <div style={{ position: 'relative', zIndex: (isHovered || isDescriptionVisible) ? 100 : 1 }}>
         <div
@@ -248,19 +217,19 @@ class Card extends React.Component {
           onMouseEnter={this.handleMouseEnter}
           onMouseLeave={this.handleMouseLeave}
           onClick={this.handleClick}
+          className={`game-card ${rarityClass} ${borderClass} ${isHovered ? 'offsetBorder2' : 'offsetBorder2'}` }
           style={{
             margin: '3px',
-            padding: isSmall ? '5px' : '10px',
-            backgroundColor: this.props.color,
-            border: '2px solid #333',
-            borderRadius: '8px',
+            padding: isSmall ? '4px' : '8px',
+            backgroundColor: baseColor,
+            borderRadius: '2px',
             cursor: 'grab',
-            width: isSmall ? '80px' : '120px',
+            width: isSmall ? '40px' : '80px',
             height: isSmall ? '60px' : '160px',
             textAlign: 'center',
             color: 'white',
             fontWeight: 'bold',
-            fontSize: isSmall ? '12px' : '14px',
+            fontSize: isSmall ? '8px' : '12px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
@@ -270,13 +239,15 @@ class Card extends React.Component {
           }}
         >
           <div style={{ 
-            fontSize: this.props.isSmall ? '14px' : '16px',  // Ajustar tamaño de fuente del ID de la carta
+            fontSize: this.props.isSmall ? '16px' : '20px',  // Ajustar tamaño de fuente del ID de la carta
+            position: 'relative',
+            top: '20%',
             marginBottom: this.props.isSmall ? '2px' : '5px'
           }}>
             {this.props.type || "🃏"}{this.props.id}
           </div>
           <div style={{ 
-            fontSize: this.props.isSmall ? '9px' : '12px', // Ajustar tamaño del nombre de la carta
+            fontSize: this.props.isSmall ? '0px' : '0px', // Ajustar tamaño del nombre de la carta
             fontStyle: 'italic',
             whiteSpace: 'nowrap',
             overflow: 'hidden',

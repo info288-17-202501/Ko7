@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Cartas - API</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        .filters {
+            display: flex;
+            gap: 15px;
+        }
+        select, button {
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .status {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .status.success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+        .status.error {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+        .cards-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        .card-header {
+            padding: 15px;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-id {
+            font-size: 18px;
+        }
+        .card-type {
+            background-color: rgba(255, 255, 255, 0.2);
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+        .card-body {
+            padding: 15px;
+        }
+        .card-name {
+            font-size: 18px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .card-rarity {
+            margin-bottom: 10px;
+            font-style: italic;
+            color: #666;
+        }
+        .card-description {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .card-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-icon {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            font-weight: bold;
+        }
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: #666;
+        }
+        .movements-container {
+            margin-top: 15px;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+        .movements-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #555;
+        }
+        .movement-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 30px);
+            grid-template-rows: repeat(3, 30px);
+            gap: 2px;
+            justify-content: center;
+        }
+        .grid-cell {
+            width: 30px;
+            height: 30px;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            border-radius: 4px;
+            position: relative;
+        }
+        .grid-cell.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .grid-cell.center {
+            background-color: #2196F3;
+            color: white;
+        }
+        .movement-range {
+            font-size: 12px;
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+        }
+        .card-image {
+            width: 100%;
+            height: auto;
+            overflow: hidden;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            aspect-ratio: 350 / 453;
+        }
+        .card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Visualizador de Cartas - Database Explorer</h1>
+    
+    <div class="controls">
+        <div class="filters">
+            <select id="typeFilter">
+                <option value="">Todos los tipos</option>
+                <option value="legend">Personaje</option>
+                <option value="unit">Aliado</option>
+                <option value="spell">Hechizo</option>
+            </select>
+
+            <label for="rarityFilter">Raridad:</label>        
+            <select id="rarityFilter">
+                <option value="">Todas las rarezas</option>
+                <option value="Comun">Comun</option>
+                <option value="Rara">Rara</option>
+                <option value="Epica">Epica</option>
+                <option value="Legendaria">Legendaria</option>
+            </select>
+        </div>
+        
+        <button id="refreshButton">Actualizar datos</button>
+    </div>
+    
+    <div id="statusContainer" class="status" style="display: none;"></div>
+    
+    <div id="cardsContainer" class="cards-container">
+        <div class="loading">Cargando cartas desde la base de datos...</div>
+    </div>
+    
+    <script>
+        // URL de la API
+        const API_URL = 'http://localhost:3030/api/cards';
+        
+        // Elementos del DOM
+        const cardsContainer = document.getElementById('cardsContainer');
+        const typeFilter = document.getElementById('typeFilter');
+        const rarityFilter = document.getElementById('rarityFilter');
+        const refreshButton = document.getElementById('refreshButton');
+        const statusContainer = document.getElementById('statusContainer');
+        
+        // Mapeo de tipos para mostrar el nombre completo
+        // En viewCards.html, busca esta sección y actualízala
+        const typeNames = {
+            'legend': 'Personaje',
+            'unit': 'Aliado', 
+            'spell': 'Hechizo'
+        };
+        
+        // Estado de la aplicación
+        let allCards = [];
+        
+        // Función para obtener cartas de la API
+        async function fetchCards() {
+            showStatus('Cargando cartas...', 'loading');
+            cardsContainer.innerHTML = '<div class="loading">Cargando cartas desde la base de datos...</div>';
+            
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+                
+                const cards = await response.json();
+                allCards = cards;
+                
+                console.log('Datos recibidos de la API:', cards);
+                
+                showStatus(`Se cargaron ${cards.length} cartas correctamente`, 'success');
+                applyFiltersAndRender();
+                
+            } catch (error) {
+                console.error('Error al cargar las cartas:', error);
+                showStatus(`Error al cargar las cartas: ${error.message}`, 'error');
+                cardsContainer.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 50px;">
+                        <h2>Error al cargar las cartas</h2>
+                        <p>${error.message}</p>
+                        <button onclick="fetchCards()">Reintentar</button>
+                    </div>
+                `;
+            }
+        }
+        
+        // Función para aplicar filtros y renderizar cartas
+        function applyFiltersAndRender() {
+            const selectedType = typeFilter.value;
+            const selectedRarity = rarityFilter.value;
+            
+            const filteredCards = allCards.filter(card => {
+                const typeMatch = !selectedType || card.type === selectedType;
+                const rarityMatch = !selectedRarity || card.rarity === selectedRarity;
+                return typeMatch && rarityMatch;
+            });
+            
+            renderCards(filteredCards);
+        }
+        
+        // Función para renderizar las cartas
+        function renderCards(cards) {
+            if (cards.length === 0) {
+                cardsContainer.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 50px;">
+                        <h2>No se encontraron cartas</h2>
+                        <p>No hay cartas que coincidan con los filtros seleccionados.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            cardsContainer.innerHTML = cards.map(card => {
+                return `
+                    <div class="card">
+                        <div class="card-header" style="background-color: ${card.color}">
+                            <span class="card-id">#${card.id || 'N/A'}</span>
+                            <span class="card-type">${typeNames[card.type] || card.type || 'Unknown'}</span>
+                        </div>
+                        <div class="card-body">
+                            ${card.image ? `
+                                <div class="card-image">
+                                    <img src="${card.image}" alt="${card.name}" onerror="this.style.display='none'">
+                                </div>
+                            ` : ''}
+                            <div class="card-name">${card.name || 'Unnamed'}</div>
+                            <div class="card-rarity">${card.rarity || 'Common'}</div>
+
+                            ${(card.effects && card.effects.length > 0) ? `
+                                <div class="effects-container">
+                                    <div class="effects-title">Efectos:</div>
+                                    ${card.effects.map(effect => `
+                                        <div class="effect-item">
+                                            <strong>${effect.name || 'Unnamed Effect'}:</strong> ${effect.description || 'No description'}
+                                            ${(effect.amount > 1) ? ` <span class="amount">(x${effect.amount})</span>` : ''}
+                                            ${(effect.target) ? ` <span class="target">[${effect.target}]</span>` : ''}
+                                            ${(effect.duration > 1) ? ` <span class="duration">(${effect.duration} turns)</span>` : ''}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+
+                            ${( card.attack !== undefined || card.health !== undefined || card.cost !== undefined || card.actions !== undefined) ? `
+                                <div class="card-stats">
+                                    ${(card.attack !== undefined) ? `
+                                        <div class="stat">
+                                            <div class="stat-icon">⚔️</div>
+                                            <div class="stat-value">${card.attack}</div>
+                                            <div>Ataque</div>
+                                        </div>
+                                    ` : ''}
+                                    ${(card.health !== undefined) ? `
+                                        <div class="stat">
+                                            <div class="stat-icon">❤️</div>
+                                            <div class="stat-value">${card.health}</div>
+                                            <div>Vida</div>
+                                        </div>
+                                    ` : ''}
+                                    ${(card.cost !== undefined) ? `
+                                        <div class="stat">
+                                            <div class="stat-icon">💎</div>
+                                            <div class="stat-value">${card.cost}</div>
+                                            <div>Costo</div>
+                                        </div>
+                                    ` : ''}
+                                    ${(card.actions !== undefined) ? `
+                                        <div class="stat">
+                                            <div class="stat-icon">🏃</div>
+                                            <div class="stat-value">${card.actions}</div>
+                                            <div>Actions</div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            ` : ''}
+
+                            ${(card.arrows && card.arrows.length > 0) ? renderMovementGrid(card.arrows) : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Función para mostrar mensajes de estado
+        function showStatus(message, type) {
+            statusContainer.textContent = message;
+            statusContainer.className = `status ${type}`;
+            statusContainer.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusContainer.style.display = 'none';
+                }, 3000);
+            }
+        }
+        
+        // Función para renderizar el grid de movimientos/flechas
+        function renderMovementGrid(movements) {
+            if (!movements || movements.length === 0) return '';
+            
+            console.log('Renderizando movimientos:', movements);
+            
+            const grid = [
+                ['↖', '↑', '↗'],
+                ['←', '·', '→'],
+                ['↙', '↓', '↘']
+            ];
+            
+            const directionMap = {
+                'TOP_LEFT': [0, 0],
+                'TOPLEFT': [0, 0],
+                'UP': [0, 1],
+                'TOP': [0, 1],
+                'TOP_RIGHT': [0, 2],
+                'TOPRIGHT': [0, 2],
+                'LEFT': [1, 0],
+                'RIGHT': [1, 2],
+                'BOTTOM_LEFT': [2, 0],
+                'BOTTOMLEFT': [2, 0],
+                'DOWN': [2, 1],
+                'BOTTOM': [2, 1],
+                'BOTTOM_RIGHT': [2, 2],
+                'BOTTOMRIGHT': [2, 2]
+            };
+            
+            let processedMovements = movements;
+            
+            if (movements.length > 0 && typeof movements[0] === 'string') {
+                processedMovements = movements.map(direction => ({
+                    direction: direction,
+                    targetType: 'Enemy'
+                }));
+            }
+
+            const movementsByTarget = {};
+
+            if (processedMovements && !Array.isArray(processedMovements) && typeof processedMovements === 'object') {
+                for (const [direction, value] of Object.entries(processedMovements)) {
+                    const targetType = 'Enemy';
+                    if (!movementsByTarget[targetType]) {
+                        movementsByTarget[targetType] = [];
+                    }
+                    movementsByTarget[targetType].push({
+                        direction: direction,
+                        targetType: targetType
+                    });
+                }
+            } else {
+                processedMovements.forEach(movement => {
+                    if (typeof movement !== 'object') {
+                        movement = { direction: movement, targetType: 'Enemy' };
+                    }
+                    
+                    const targetType = movement.targetType || 'Enemy';
+                    if (!movementsByTarget[targetType]) {
+                        movementsByTarget[targetType] = [];
+                    }
+                    movementsByTarget[targetType].push(movement);
+                });
+            }
+            
+            let allGridsHTML = '';
+            
+            for (const [targetType, targetMovements] of Object.entries(movementsByTarget)) {
+                const directions = targetMovements.map(m => m.direction);
+                
+                let gridHTML = `
+                    <div class="movements-container">
+                        <div class="movements-title">
+                            ${targetType === "Aliado" ? '🔵' : '🔴'} 
+                            Movimientos (${targetType})
+                        </div>
+                        <div class="movement-grid">
+                `;
+                
+                for (let i = 0; i < 3; i++) {
+                    for (let j = 0; j < 3; j++) {
+                        if (i === 1 && j === 1) {
+                            gridHTML += `<div class="grid-cell center">⭐</div>`;
+                            continue;
+                        }
+                        
+                        let direction = null;
+                        for (const [dir, [row, col]] of Object.entries(directionMap)) {
+                            if (row === i && col === j) {
+                                direction = dir;
+                                break;
+                            }
+                        }
+                        
+                        if (direction) {
+                            const directionMatches = directions.map(d => d.toUpperCase()).includes(direction.toUpperCase());
+                            
+                            if (directionMatches) {
+                                const movement = targetMovements.find(m => 
+                                    m.direction && m.direction.toUpperCase() === direction.toUpperCase()
+                                );
+                                
+                                gridHTML += `
+                                    <div class="grid-cell active">
+                                        ${grid[i][j]}
+                                        ${movement && movement.range ? `<span class="movement-range">${movement.range}</span>` : ''}
+                                    </div>
+                                `;
+                            } else {
+                                gridHTML += `<div class="grid-cell">${grid[i][j]}</div>`;
+                            }
+                        } else {
+                            gridHTML += `<div class="grid-cell">${grid[i][j]}</div>`;
+                        }
+                    }
+                }
+                
+                gridHTML += `
+                        </div>
+                    </div>
+                `;
+                
+                allGridsHTML += gridHTML;
+            }
+            
+            return allGridsHTML;
+        }
+        
+        // Event listeners
+        typeFilter.addEventListener('change', applyFiltersAndRender);
+        rarityFilter.addEventListener('change', applyFiltersAndRender);
+        refreshButton.addEventListener('click', fetchCards);
+        
+        // Cargar cartas al iniciar
+        fetchCards();
+    </script>
+</body>
+</html>
